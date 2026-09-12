@@ -3,7 +3,7 @@
     "cheerio": "^1.2.0"
   },
   "name": "soundcloud-core",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "Fast, Minimalist, Unofficial SoundCloud v2 API client wrapper for Node.js",
   "main": "index.js",
   "devDependencies": {},
