@@ -2,15 +2,20 @@
 //
 // Author(s) -> BlazeInferno64
 //
-// Last updated: 09/05/2026
+// Last updated: 19/09/2026
 
 const { ua } = require('./user-agent');
 const { getFreshClientID } = require('./client-id');
+const { validateIp } = require("./ip");
 const { getCDNUrl } = require('./cdn');
 
 const cheerio = require("cheerio");
 
-const fetchSong = async (songUrl, userAgent, clientID) => {
+const fetchSong = async (songUrl, userAgent, clientID, forwardedIp) => {
+    // Validate up-front (outside the try/catch) so an invalid IP surfaces as its own IP_Validation_Error
+    // instead of the generic error below - and before any request is made.
+    if (forwardedIp !== undefined && forwardedIp !== null) validateIp(forwardedIp); // throws on an invalid IP
+
     try {
         if (!songUrl || typeof songUrl !== "string") {
             throw new Error("Invalid song URL provided!");
@@ -21,6 +26,7 @@ const fetchSong = async (songUrl, userAgent, clientID) => {
         const response = await fetch(resolveUrl, {
             headers: {
                 'User-Agent': userAgent || ua,
+                ...(forwardedIp && { 'X-Forwarded-For': forwardedIp }),
             }
         })
 
@@ -40,12 +46,13 @@ const fetchSong = async (songUrl, userAgent, clientID) => {
             const trackRes = await fetch(`https://api-v2.soundcloud.com/tracks/${track.id}?client_id=${clientID}`, {
                 headers: {
                     'User-Agent': userAgent || ua,
+                    ...(forwardedIp && { 'X-Forwarded-For': forwardedIp }),
                 }
             });
             track = await trackRes.json();
         }
 
-        const cdnUrl = await getCDNUrl(track, clientID, userAgent || ua);
+        const cdnUrl = await getCDNUrl(track, clientID, userAgent || ua, forwardedIp);
 
         if (!cdnUrl) {
             throw new Error(`No playable stream found for track: ${track.title}`);
@@ -99,4 +106,3 @@ const fetchSong = async (songUrl, userAgent, clientID) => {
 module.exports = {
     fetchSong
 }
-

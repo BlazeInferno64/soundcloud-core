@@ -2,10 +2,11 @@
 //
 // Author(s) -> BlazeInferno64
 //
-// Last updated: 09/07/2026
+// Last updated: 19/09/2026
 
 const { ua } = require('./user-agent');
 const { getFreshClientID } = require('./client-id');
+const { validateIp } = require("./ip");
 
 const CHUNK_SIZE = 50; // SoundCloud's batch tracks endpoint caps out around here - stay safely under it
 
@@ -43,7 +44,7 @@ const reduceTrack = (id, track) => {
 
 // Fetches full track data for a batch of stub ids, chunked to stay under SoundCloud's per-request limit.
 // Returns a Map of id -> raw track so failed/missing ids can just fall back to null downstream.
-const resolveStubTracks = async (ids, userAgent, clientID) => {
+const resolveStubTracks = async (ids, userAgent, clientID, forwardedIp) => {
     const resolved = new Map();
 
     for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
@@ -53,6 +54,7 @@ const resolveStubTracks = async (ids, userAgent, clientID) => {
         const response = await fetch(idsUrl, {
             headers: {
                 'User-Agent': userAgent || ua,
+                ...(forwardedIp && { 'X-Forwarded-For': forwardedIp }),
             }
         });
 
@@ -67,7 +69,11 @@ const resolveStubTracks = async (ids, userAgent, clientID) => {
     return resolved;
 };
 
-const fetchPlaylist = async (playlistUrl, userAgent, clientID, limit = 10) => {
+const fetchPlaylist = async (playlistUrl, userAgent, clientID, limit = 10, forwardedIp) => {
+    // Validate up-front (outside the try/catch) so an invalid IP surfaces as its own IP_Validation_Error
+    // instead of the generic error below - and before any request is made.
+    if (forwardedIp !== undefined && forwardedIp !== null) validateIp(forwardedIp); // throws on an invalid IP
+
     try {
         if (!playlistUrl || typeof playlistUrl !== "string") {
             throw new Error("Invalid playlist URL provided!");
@@ -75,13 +81,14 @@ const fetchPlaylist = async (playlistUrl, userAgent, clientID, limit = 10) => {
 
         const maxTracks = resolveLimit(limit);
 
-        if (!clientID) clientID = await getFreshClientID(userAgent);
+        if (!clientID) clientID = await getFreshClientID(userAgent, forwardedIp);
 
         const resolveUrl = `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(playlistUrl)}&client_id=${clientID}`;
 
         const response = await fetch(resolveUrl, {
             headers: {
                 'User-Agent': userAgent || ua,
+                ...(forwardedIp && { 'X-Forwarded-For': forwardedIp }),
             }
         });
 
@@ -102,7 +109,7 @@ const fetchPlaylist = async (playlistUrl, userAgent, clientID, limit = 10) => {
         // Batch-fetch the missing ones so the playlist comes back fully populated, same as the web app does.
         const stubIds = rawTracks.filter(t => !t.title).map(t => t.id);
         const resolvedStubs = stubIds.length
-            ? await resolveStubTracks(stubIds, userAgent, clientID)
+            ? await resolveStubTracks(stubIds, userAgent, clientID, forwardedIp)
             : new Map();
 
         const tracks = rawTracks.map(t =>

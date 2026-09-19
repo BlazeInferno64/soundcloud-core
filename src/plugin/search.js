@@ -2,18 +2,23 @@
 //
 // Author(s) -> BlazeInferno64
 //
-// Last updated: 09/05/2026
+// Last updated: 19/09/2026
 
 const { ua } = require('./user-agent');
 const { getFreshClientID } = require('./client-id');
+const { validateIp } = require("./ip");
 
-const search = async (query, userAgent, clientID, options = {}) => {
+const search = async (query, userAgent, clientID, options = {}, forwardedIp) => {
+    // Validate up-front (outside the try/catch) so an invalid IP surfaces as its own IP_Validation_Error
+    // instead of the generic error below - and before any request is made.
+    if (forwardedIp !== undefined && forwardedIp !== null) validateIp(forwardedIp); // throws on an invalid IP
+
     try {
         if (!query || typeof query !== "string") {
             throw new Error("Invalid search query provided!");
         }
 
-        if (!clientID) clientID = await getFreshClientID(userAgent);
+        if (!clientID) clientID = await getFreshClientID(userAgent, forwardedIp);
 
         const limit = options.limit || 10; // How many results to return - defaults to 10, same as the web app's initial batch
 
@@ -22,6 +27,7 @@ const search = async (query, userAgent, clientID, options = {}) => {
         const response = await fetch(searchUrl, {
             headers: {
                 'User-Agent': userAgent || ua,
+                ...(forwardedIp && { 'X-Forwarded-For': forwardedIp }),
             }
         });
 

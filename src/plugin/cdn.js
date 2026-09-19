@@ -2,17 +2,22 @@
 //
 // Author(s) -> BlazeInferno64
 //
-// Last updated: 09/05/2026
+// Last updated: 19/09/2026
 
 const { ua } = require('./user-agent');
 const { getFreshClientID } = require('./client-id');
+const { validateIp } = require("./ip");
 
 //const cheerio = require("cheerio");
 
-const getCDNUrl = async (track, clientID, userAgent) => {
+const getCDNUrl = async (track, clientID, userAgent, forwardedIp) => {
+    // Validate up-front (outside the try/catch) so an invalid IP surfaces as its own IP_Validation_Error
+    // instead of the generic error below - and before any request is made.
+    if (forwardedIp !== undefined && forwardedIp !== null) validateIp(forwardedIp); // throws on an invalid IP
+
     try {
         if (!track) throw new Error("Track ID is required to fetch the CDN URL.");
-        if (!clientID) clientID = await getFreshClientID(userAgent);
+        if (!clientID) clientID = await getFreshClientID(userAgent, forwardedIp);
 
         if (!track.media?.transcodings?.length) return null;
 
@@ -50,6 +55,7 @@ const getCDNUrl = async (track, clientID, userAgent) => {
         const response = await fetch(url, {
             headers: {
                 'User-Agent': userAgent || ua,
+                ...(forwardedIp && { 'X-Forwarded-For': forwardedIp }),
                 'Accept': 'application/json' // Requesting JSON response
             }
         })

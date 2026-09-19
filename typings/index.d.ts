@@ -2,7 +2,7 @@
 //
 // Author(s) -> BlazeInferno64
 //
-// Last updated: 09/09/2026
+// Last updated: 19/09/2026
 
 // Type definitions for 'soundcloud-core'
 
@@ -530,6 +530,20 @@ interface SoundCloudClientOptions {
 }
 
 /**
+ * Options accepted by {@link SoundCloudClient.getClientId}.
+ */
+interface ClientIdOptions {
+    /**
+     * An optional IPv4 or IPv6 address to send in the `X-Forwarded-For` header for this request only.
+     *
+     * **Disclaimer:** this is best-effort only and may not always be successful - SoundCloud (or a CDN/proxy in front of it) is free to ignore or override the header and use the real connecting IP instead.
+     *
+     * Must be a valid IP address, otherwise an `IP_Validation_Error` is thrown before any request is made.
+     */
+    xForwardedFor?: string;
+}
+
+/**
  * Options accepted by {@link SoundCloudClient.getMetaData}.
  */
 interface SongOptions {
@@ -541,6 +555,14 @@ interface SongOptions {
      * A custom `User-Agent` header to use for this request only. Falls back to the client's configured user agent when omitted.
      */
     userAgent?: string;
+    /**
+     * An optional IPv4 or IPv6 address to send in the `X-Forwarded-For` header for this request only.
+     *
+     * **Disclaimer:** this is best-effort only and may not always be successful - SoundCloud (or a CDN/proxy in front of it) is free to ignore or override the header and use the real connecting IP instead.
+     *
+     * Must be a valid IP address, otherwise an `IP_Validation_Error` is thrown before any request is made.
+     */
+    xForwardedFor?: string;
 }
 
 /**
@@ -562,6 +584,14 @@ interface PlaylistOptions {
      */
     userAgent?: string;
     /**
+     * An optional IPv4 or IPv6 address to send in the `X-Forwarded-For` header for this request only.
+     *
+     * **Disclaimer:** this is best-effort only and may not always be successful - SoundCloud (or a CDN/proxy in front of it) is free to ignore or override the header and use the real connecting IP instead.
+     *
+     * Must be a valid IP address, otherwise an `IP_Validation_Error` is thrown before any request is made.
+     */
+    xForwardedFor?: string;
+    /**
      * How many tracks to include in the resolved playlist - a positive integer, or `"max"` for the entire playlist. Defaults to `10`.
      */
     limit?: PlaylistLimit;
@@ -579,11 +609,19 @@ interface ProfileOptions {
      * A custom `User-Agent` header to use for this request only. Falls back to the client's configured user agent when omitted.
      */
     userAgent?: string;
+    /**
+     * An optional IPv4 or IPv6 address to send in the `X-Forwarded-For` header for this request only.
+     *
+     * **Disclaimer:** this is best-effort only and may not always be successful - SoundCloud (or a CDN/proxy in front of it) is free to ignore or override the header and use the real connecting IP instead.
+     *
+     * Must be a valid IP address, otherwise an `IP_Validation_Error` is thrown before any request is made.
+     */
+    xForwardedFor?: string;
 }
 
 /**
  * Options accepted by {@link SoundCloudClient.search}. Any additional
- * search-tuning properties beyond `query` and `userAgent` are passed
+ * search-tuning properties beyond `query`, `userAgent` and `xForwardedFor` are passed
  * through to the underlying search request.
  */
 interface SearchOptions {
@@ -595,6 +633,14 @@ interface SearchOptions {
      * A custom `User-Agent` header to use for this request only. Falls back to the client's configured user agent when omitted.
      */
     userAgent?: string;
+    /**
+     * An optional IPv4 or IPv6 address to send in the `X-Forwarded-For` header for this request only.
+     *
+     * **Disclaimer:** this is best-effort only and may not always be successful - SoundCloud (or a CDN/proxy in front of it) is free to ignore or override the header and use the real connecting IP instead.
+     *
+     * Must be a valid IP address, otherwise an `IP_Validation_Error` is thrown before any request is made.
+     */
+    xForwardedFor?: string;
     /**
      * The maximum number of results to return. Defaults to `10`, matching the web app's initial batch size.
      */
@@ -644,6 +690,9 @@ declare class SoundCloudClient {
      * Returns the client's current SoundCloud `client_id`, fetching a fresh
      * one automatically if none has been set yet.
      *
+     * @param clientIdOptions - Optional per-call options.
+     * @param clientIdOptions.xForwardedFor - An optional IPv4/IPv6 address to send in the `X-Forwarded-For` header if a fresh `client_id` has to be fetched. Best-effort only - may not always be successful.
+     *
      * @returns A promise that resolves with the client's `client_id`.
      *
      * @example
@@ -652,7 +701,7 @@ declare class SoundCloudClient {
      * // Returns a string type value
      * ```
      */
-    getClientId(): Promise<string>;
+    getClientId(clientIdOptions?: ClientIdOptions): Promise<string>;
 
     /**
      * Resolves a SoundCloud track URL into fully populated metadata,
@@ -661,10 +710,11 @@ declare class SoundCloudClient {
      * @param songOptions - Options describing which track to fetch.
      * @param songOptions.url - The full SoundCloud URL of the track to resolve.
      * @param songOptions.userAgent - A custom `User-Agent` header for this request only.
+     * @param songOptions.xForwardedFor - An optional IPv4/IPv6 address to send in the `X-Forwarded-For` header for this request only - best-effort, may not always be successful (SoundCloud can ignore or override it). Must be a valid IPv4/IPv6 address.
      *
      * @returns A promise that resolves with the track's {@link MetaData}.
      *
-     * @throws If no URL is provided, no client ID is available, the URL doesn't resolve to a track, or no playable stream could be found.
+     * @throws If no URL is provided, an invalid `xForwardedFor` IP is given, no client ID is available, the URL doesn't resolve to a track, or no playable stream could be found.
      *
      * @example
      * ```js
@@ -681,11 +731,12 @@ declare class SoundCloudClient {
      * @param playlistOptions - Options describing which playlist to fetch.
      * @param playlistOptions.url - The full SoundCloud URL of the playlist to resolve.
      * @param playlistOptions.userAgent - A custom `User-Agent` header for this request only.
+     * @param playlistOptions.xForwardedFor - An optional IPv4/IPv6 address to send in the `X-Forwarded-For` header for this request only - best-effort, may not always be successful (SoundCloud can ignore or override it). Must be a valid IPv4/IPv6 address.
      * @param playlistOptions.limit - How many tracks to include - a positive integer, or `"max"` for every track. Defaults to `10`.
      *
      * @returns A promise that resolves with the {@link Playlist}.
      *
-     * @throws If no URL is provided, no client ID is available, the URL doesn't resolve to a playlist, or an invalid `limit` is given.
+     * @throws If no URL is provided, an invalid `xForwardedFor` IP is given, no client ID is available, the URL doesn't resolve to a playlist, or an invalid `limit` is given.
      *
      * @example
      * ```js
@@ -705,10 +756,11 @@ declare class SoundCloudClient {
      * @param profileOptions - Options describing which profile to fetch.
      * @param profileOptions.username - Either a bare username (e.g. `"BlazeInferno64"`) or a full profile URL.
      * @param profileOptions.userAgent - A custom `User-Agent` header for this request only.
+     * @param profileOptions.xForwardedFor - An optional IPv4/IPv6 address to send in the `X-Forwarded-For` header for this request only - best-effort, may not always be successful (SoundCloud can ignore or override it). Must be a valid IPv4/IPv6 address.
      *
      * @returns A promise that resolves with the {@link Profile}.
      *
-     * @throws If no username/URL is provided, no client ID is available, or the URL doesn't resolve to a user profile.
+     * @throws If no username/URL is provided, an invalid `xForwardedFor` IP is given, no client ID is available, or the URL doesn't resolve to a user profile.
      *
      * @example
      * ```js
@@ -725,11 +777,12 @@ declare class SoundCloudClient {
      * @param searchOptions - Options describing the search.
      * @param searchOptions.query - The search query text.
      * @param searchOptions.userAgent - A custom `User-Agent` header for this request only.
+     * @param searchOptions.xForwardedFor - An optional IPv4/IPv6 address to send in the `X-Forwarded-For` header for this request only - best-effort, may not always be successful (SoundCloud can ignore or override it). Must be a valid IPv4/IPv6 address.
      * @param searchOptions.limit - The maximum number of results to return. Defaults to `10`.
      *
      * @returns A promise that resolves with an array of matching {@link Search} results. Resolves to an empty array if the search returns no results.
      *
-     * @throws If no query is provided, no client ID is available, or the search request fails.
+     * @throws If no query is provided, an invalid `xForwardedFor` IP is given, no client ID is available, or the search request fails.
      *
      * @example
      * ```js
@@ -745,6 +798,7 @@ declare namespace soundcloudJs {
     export {
         SoundCloudClient,
         SoundCloudClientOptions,
+        ClientIdOptions,
         SongOptions,
         PlaylistOptions,
         PlaylistLimit,

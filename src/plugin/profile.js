@@ -2,10 +2,11 @@
 //
 // Author(s) -> BlazeInferno64
 //
-// Last updated: 09/07/2026
+// Last updated: 19/09/2026
 
 const { ua } = require('./user-agent');
 const { getFreshClientID } = require('./client-id');
+const { validateIp } = require("./ip");
 
 // Accepts either a bare username ("BlazeInferno64") or a full profile URL and normalizes it into
 // something the resolve endpoint can work with either way.
@@ -14,13 +15,17 @@ const normalizeProfileUrl = (input) => {
     return `https://soundcloud.com/${input.trim().toLowerCase()}`;
 };
 
-const fetchProfile = async (profileInput, userAgent, clientID) => {
+const fetchProfile = async (profileInput, userAgent, clientID, forwardedIp) => {
+    // Validate up-front (outside the try/catch) so an invalid IP surfaces as its own IP_Validation_Error
+    // instead of the generic error below - and before any request is made.
+    if (forwardedIp !== undefined && forwardedIp !== null) validateIp(forwardedIp); // throws on an invalid IP
+
     try {
         if (!profileInput || typeof profileInput !== "string") {
             throw new Error("Invalid username or profile URL provided!");
         }
 
-        if (!clientID) clientID = await getFreshClientID(userAgent);
+        if (!clientID) clientID = await getFreshClientID(userAgent, forwardedIp);
 
         const profileUrl = normalizeProfileUrl(profileInput);
         const resolveUrl = `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(profileUrl)}&client_id=${clientID}`;
@@ -28,6 +33,7 @@ const fetchProfile = async (profileInput, userAgent, clientID) => {
         const response = await fetch(resolveUrl, {
             headers: {
                 'User-Agent': userAgent || ua,
+                ...(forwardedIp && { 'X-Forwarded-For': forwardedIp }),
             }
         });
 

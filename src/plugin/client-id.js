@@ -2,20 +2,36 @@
 //
 // Author(s) -> BlazeInferno64
 //
-// Last updated: 09/05/2026
+// Last updated: 19/09/2026
 
 "use strict";
 
 const { ua } = require('./user-agent');
 
+const { validateIp } = require("./ip");
+
 const cheerio = require("cheerio");
 
-const getFreshClientID = async (userAgent) => {
+const getFreshClientID = async (userAgent, forwardedIp) => {
+    // Validate once, up-front and outside the try/catch, so an invalid IP surfaces as its own
+    // IP_Validation_Error (and before any request is made) instead of being wrapped in "Cannot fetch clientID...".
+    const hasForwardedIp = forwardedIp !== undefined && forwardedIp !== null;
+    if (hasForwardedIp) validateIp(forwardedIp); // throws on an invalid IP
+
     try {
+
+        const buildHeaders = () => {
+            const headers = {
+                'User-Agent': userAgent || ua
+            };
+
+            if (hasForwardedIp) headers['X-Forwarded-For'] = forwardedIp;
+
+            return headers;
+        };
+
         const response = await fetch('https://soundcloud.com', {
-            headers: {
-                'User-Agent': userAgent || ua,
-            }
+            headers: buildHeaders(forwardedIp),
         });
 
         const html = await response.text();
@@ -34,10 +50,11 @@ const getFreshClientID = async (userAgent) => {
         // Iterate through the script URLs in reverse order to find the latest one
         for (const url of scriptUrls.reverse()) {
             const jsRes = await fetch(url, {
-                headers: {
+                /*headers: {
                     'User-Agent': userAgent || ua,
                     // intentionally not forcing Content-Type to match original behavior
-                }
+                }*/
+               headers: buildHeaders(forwardedIp),
             });
             const jsContent = await jsRes.text();
 
